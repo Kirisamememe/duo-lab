@@ -3,64 +3,77 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>STARFALL</title>
+<title>ARKLIGHT 星灯の航路</title>
 <!--
-  iPhone Duo の右の列で「見切れ」が出るかを比べる、架空のゲームの LP。
+  iPhone Duo の右の列で「見切れ」が出るかを比べる、架空のゲーム（ARKLIGHT）の LP。
     ?mode=plain  最適化なし。よくある LP の作り。
     ?mode=duo    最適化あり。KV・ヘッダー・カルーセル・シートを右の列の奥（画面の物理的な右端）まではみ出させ、
                  その副作用（横揺れ・縮小）を止める。列の無い端末では --gutter が 0 になり、はみ出さない。
-    ?open=1      読み込みの 1.5 秒後にキャラクターのシートを開く。
+    ?open=1      読み込みの 1.5 秒後に最初の場所のシートを開く。
+    ?mid=1       （open=1 と合わせて）シートを開く途中の位置（translateX(50%)）で止める。撮影用。
     ?slow=1      シートの動きを 3 秒にする（途中を撮るため）。
-    ?at=chars    読み込み時にキャラクターの段までスクロールする。
+    ?at=chars    読み込み時にカルーセルの段までスクロールする。
+  絵は assets/ の JPEG。assets/src/ の scene.js・scenes.js・gen.mjs で手続き的に描いたもの（node gen.mjs で作り直す）。
 -->
 <style>
-  :root { --page: #0b1020; --ink: #f8fafc; --muted: #a5b4fc; --sheet-ms: 450ms; --gutter: 0px; }
+  :root { --page: #060917; --ink: #f3efe6; --gold: #e8c98f; --muted: #98a2c8; --sheet-ms: 450ms; --gutter: 0px;
+    --serif: "Bodoni 72", Didot, "Hiragino Mincho ProN", serif; --mincho: "Hiragino Mincho ProN", "Hiragino Mincho Pro", serif; }
   html { background: var(--page); color: var(--ink); }
-  body { margin: 0; font: 15px/1.6 -apple-system, system-ui, sans-serif; }
+  body { margin: 0; font: 15px/1.75 "Hiragino Sans", -apple-system, system-ui, sans-serif; }
   h1, h2, h3, p { margin: 0; }
 
-  /* ヘッダー */
+  /* ヘッダー：絵の上に重なる、半透明の濃い帯。 */
   .header { position: fixed; z-index: 20; top: 0; left: 0; right: 0; height: 56px; }
-  .header-bar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #312e81; box-sizing: border-box; }
-  .logo { font-weight: 800; letter-spacing: .3em; font-size: 14px; }
-  .menu { width: 22px; height: 14px; border-block: 2px solid var(--ink); position: relative; }
-  .menu::after { content: ""; position: absolute; inset: 4px 0 auto; border-top: 2px solid var(--ink); }
+  .header-bar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-sizing: border-box;
+    background: rgba(6, 9, 23, .62); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+    border-bottom: 1px solid rgba(232, 201, 143, .28); }
+  .logo { font-family: var(--serif); font-size: 17px; letter-spacing: .3em; color: var(--ink); }
+  .menu { width: 24px; height: 9px; border-block: 1px solid var(--gold); }
 
-  /* キービジュアル。太陽を右寄りに置いた空と山並み。 */
-  .hero { position: relative; height: 620px; overflow: hidden; display: grid; align-content: end; gap: 12px; padding: 0 24px 72px;
-    background:
-      radial-gradient(circle at 80% 36%, #fff7ed 0 5%, #fdba74 9%, rgba(249, 115, 22, 0) 34%),
-      linear-gradient(180deg, #1e1b4b 0%, #6d28d9 42%, #f97316 74%, #fbbf24 100%); }
-  .hero::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46%; background: var(--page);
-    clip-path: polygon(0 58%, 10% 38%, 22% 52%, 36% 18%, 50% 46%, 64% 26%, 78% 50%, 90% 30%, 100% 44%, 100% 100%, 0 100%); }
-  .hero > * { position: relative; z-index: 2; }
-  .title { font-size: 44px; font-weight: 900; letter-spacing: .12em; line-height: 1; text-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
-  .release { color: #fde68a; letter-spacing: .2em; font-size: 13px; }
-  .cta { justify-self: start; padding: 12px 28px; border-radius: 999px; background: #fbbf24; color: #1e1b4b; font-weight: 800; }
+  /* キービジュアル。右に環を持つ巨大な月。右端で切れると月が欠ける。 */
+  .hero { position: relative; box-sizing: border-box; height: 660px; overflow: hidden; display: grid; align-content: end; padding: 0 24px 120px; background: #0a0e2a; }
+  .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left top; }
+  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(0deg, rgba(5, 7, 22, .9) 0%, rgba(5, 7, 22, .55) 22%, rgba(5, 7, 22, 0) 46%); }
+  .hero-copy { position: relative; z-index: 2; display: grid; gap: 6px; justify-items: start; }
+  .title { font-family: var(--serif); font-weight: 400; font-size: 54px; line-height: 1.05; letter-spacing: .05em; text-shadow: 0 2px 28px rgba(255, 214, 168, .35); }
+  .title-ja { font-family: var(--mincho); font-weight: 600; font-size: 19px; letter-spacing: .6em; color: var(--gold); }
+  .lead { margin-top: 10px; font-family: var(--mincho); font-size: 14px; letter-spacing: .08em; color: rgba(243, 239, 230, .85); }
+  .cta { margin-top: 14px; padding: 12px 30px; border: 1px solid var(--gold); border-radius: 2px; background: rgba(232, 201, 143, .16);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--ink); font-family: var(--mincho); font-weight: 600; letter-spacing: .2em; }
+  .release { margin-top: 6px; font-size: 12px; color: var(--muted); letter-spacing: .08em; }
 
-  /* キャラクターのカルーセル。次のカードが右に覗く。 */
-  .section { display: grid; gap: 16px; padding: 40px 0; }
-  .section h2 { padding: 0 24px; font-size: 13px; letter-spacing: .3em; color: var(--muted); }
+  /* 行き先のカルーセル。次のカードが右に覗く。 */
+  .section { display: grid; gap: 20px; padding: 56px 0 0; }
+  .section-head { display: grid; gap: 4px; padding: 0 24px; }
+  .section h2 { font-family: var(--mincho); font-weight: 600; font-size: 24px; letter-spacing: .12em; }
+  .section-head p { font-size: 13px; color: var(--muted); }
   .chars { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 24px; scroll-padding: 0 24px; scrollbar-width: none; }
-  .char { flex: 0 0 78%; height: 360px; border: 0; font: inherit; text-align: left; color: inherit; border-radius: 20px; scroll-snap-align: start; position: relative; overflow: hidden; display: grid; align-content: end; padding: 20px; box-sizing: border-box; }
-  .char::before { content: ""; position: absolute; left: 50%; top: 18%; width: 120px; height: 120px; margin-left: -60px; border-radius: 50%; background: rgba(255, 255, 255, .85); }
-  .char::after { content: ""; position: absolute; left: 50%; top: 46%; width: 200px; height: 240px; margin-left: -100px; border-radius: 100px 100px 0 0; background: rgba(255, 255, 255, .7); }
-  .char h3 { position: relative; z-index: 1; font-size: 24px; color: #0b1020; }
-  .char:nth-child(1) { background: linear-gradient(160deg, #f472b6, #7c3aed); }
-  .char:nth-child(2) { background: linear-gradient(160deg, #38bdf8, #1d4ed8); }
-  .char:nth-child(3) { background: linear-gradient(160deg, #34d399, #0f766e); }
-  .char:nth-child(4) { background: linear-gradient(160deg, #fbbf24, #ea580c); }
+  .char { flex: 0 0 78%; height: 400px; border: 0; padding: 0; font: inherit; text-align: left; color: inherit; border-radius: 3px; scroll-snap-align: start;
+    position: relative; overflow: hidden; display: grid; align-content: end; box-shadow: 0 0 0 1px rgba(232, 201, 143, .3); }
+  .char img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .char::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5, 7, 22, .92) 0%, rgba(5, 7, 22, .5) 32%, rgba(5, 7, 22, 0) 58%); }
+  .char::after { content: ""; position: absolute; inset: 8px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 1px; pointer-events: none; }
+  .char-text { position: relative; z-index: 1; display: grid; gap: 2px; padding: 0 24px 26px; }
+  .char h3 { font-family: var(--mincho); font-weight: 600; font-size: 24px; letter-spacing: .1em; }
+  .char-sub { font-size: 12px; letter-spacing: .12em; color: var(--gold); }
 
-  .news { display: grid; gap: 12px; padding: 0 24px 160px; }
-  .news p { padding: 16px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+  .news { display: grid; padding: 0 24px 160px; }
+  .news p { display: grid; gap: 2px; padding: 16px 0; border-top: 1px solid rgba(243, 239, 230, .14); }
+  .news p:last-child { border-bottom: 1px solid rgba(243, 239, 230, .14); }
+  .news time { font-family: var(--serif); font-size: 14px; letter-spacing: .1em; color: var(--gold); }
+  .section .news { padding-top: 0; }
 
-  /* キャラクターのシート。右から出る。 */
-  .sheet-body { padding: 24px; box-sizing: border-box; height: 100%; background: linear-gradient(180deg, #fdf2f8, #ede9fe); color: #1e1b4b; }
-  .sheet-art { height: 240px; border-radius: 16px; background: linear-gradient(160deg, #f472b6, #7c3aed); margin-bottom: 16px; }
-  .sheet-body h3 { font-size: 26px; }
+  /* 場所のシート。右から出る。 */
+  .sheet-body { height: 100%; box-sizing: border-box; background: var(--page); color: var(--ink); overflow: hidden; border-left: 1px solid rgba(232, 201, 143, .3); }
+  .sheet-art { display: block; width: 100%; height: 300px; object-fit: cover; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+  .sheet-text { display: grid; gap: 10px; padding: 0 24px 24px; margin-top: -20px; position: relative; }
+  .sheet-kana { font-size: 12px; letter-spacing: .3em; color: var(--gold); }
+  .sheet-body h3 { font-family: var(--mincho); font-weight: 600; font-size: 28px; letter-spacing: .1em; line-height: 1.3; }
+  .sheet-text p { font-family: var(--mincho); font-size: 15px; line-height: 1.9; color: rgba(243, 239, 230, .88); }
   /* 最適化なし：よくある fixed の <dialog>。 */
   dialog.sheet { position: fixed; inset: 0 0 0 auto; width: 86%; max-width: none; height: auto; max-height: none; margin: 0; padding: 0; border: 0; outline: none;
-    background: none; box-shadow: -12px 0 32px rgba(0, 0, 0, .45); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
+    background: none; color: inherit; box-shadow: -12px 0 32px rgba(0, 0, 0, .5); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
   dialog.sheet.in { transform: none; }
   dialog.sheet::backdrop { background: rgba(0, 0, 0, .55); }
   /* 最適化あり：文書の中の absolute の層を、開いた時点のスクロール位置に置く（top は JS）。
@@ -71,15 +84,18 @@
   .layer-clip { position: absolute; top: 0; left: 0; width: calc(100% + var(--gutter)); height: calc(100lvh + 160px); overflow: clip; }
   .layer-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); opacity: 0; transition: opacity var(--sheet-ms) ease; }
   /* 幅は「見える範囲の 86%」に列の幅を足したもの（.layer-clip の幅は見える範囲 + 列の幅）。 */
-  .layer-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: calc((100% - var(--gutter)) * .86 + var(--gutter)); box-shadow: -12px 0 32px rgba(0, 0, 0, .45); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
-  .layer-sheet .sheet-body { padding-right: calc(24px + var(--gutter)); }
+  .layer-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: calc((100% - var(--gutter)) * .86 + var(--gutter)); box-shadow: -12px 0 32px rgba(0, 0, 0, .5); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
+  .layer-sheet .sheet-text { padding-right: calc(24px + var(--gutter)); }
   .layer.in .layer-backdrop { opacity: 1; }
   .layer.in .layer-sheet { transform: none; }
+  /* ?mid=1：開く途中の位置で止める（撮影用）。 */
+  .mid dialog.sheet, .mid .layer-sheet { transition: none; transform: translateX(50%); }
+  .mid .layer-backdrop { transition: none; opacity: .5; }
 
   /* ===== 最適化あり：右の列の奥まで（--gutter の分だけ）はみ出させる。文字は見える範囲に置く。 ===== */
   /* ヘッダー：上に残し続ける（fixed・sticky）と列の縁で切られるので、KV に重ねてスクロールで流れる absolute にする。 */
   .duo .header { position: absolute; right: auto; width: calc(100% + var(--gutter)); }
-  .duo .header-bar { padding-right: calc(16px + var(--gutter)); }
+  .duo .header-bar { padding-right: calc(20px + var(--gutter)); }
   .duo .hero { margin-right: calc(-1 * var(--gutter)); padding-right: calc(24px + var(--gutter)); }
   .duo .chars { margin-right: calc(-1 * var(--gutter)); padding-right: calc(24px + var(--gutter)); }
 </style>
@@ -89,31 +105,36 @@
   <div class="layer-clip">
     <div class="layer-backdrop" id="layer-backdrop"></div>
     <div class="layer-sheet" role="dialog" aria-modal="true" aria-labelledby="layer-name">
-      <div class="sheet-body"><div class="sheet-art"></div><h3 id="layer-name">リラ</h3><p>星降る夜に目覚めた、記憶を持たない少女。流れ星の欠片を集めて旅をする。</p></div>
+      <div class="sheet-body"><img class="sheet-art" id="layer-art" alt=""><div class="sheet-text"><span class="sheet-kana" id="layer-kana"></span><h3 id="layer-name">アルメ港</h3><p id="layer-text"></p></div></div>
     </div>
   </div>
 </div>
-<header class="header"><div class="header-bar"><span class="logo">STARFALL</span><span class="menu"></span></div></header>
+<header class="header"><div class="header-bar"><span class="logo">ARKLIGHT</span><span class="menu"></span></div></header>
 <section class="hero">
-  <p class="release">2026.12.24 RELEASE</p>
-  <h1 class="title">STAR<br>FALL</h1>
-  <a class="cta">事前登録</a>
+  <img class="hero-img" src="assets/hero.jpg" alt="">
+  <div class="hero-copy">
+    <h1 class="title">ARKLIGHT</h1>
+    <p class="title-ja">星灯の航路</p>
+    <p class="lead">空に沈んだ世界を、灯台の船で渡る。</p>
+    <a class="cta">事前登録する</a>
+    <p class="release">2026年12月24日 配信予定</p>
+  </div>
 </section>
 <section class="section" id="chars">
-  <h2>CHARACTERS</h2>
+  <div class="section-head"><h2>航路の行き先</h2><p>雲海の港から、星の降る谷まで。</p></div>
   <div class="chars">
-    <button class="char" data-name="リラ"><h3>リラ</h3></button>
-    <button class="char" data-name="カイ"><h3>カイ</h3></button>
-    <button class="char" data-name="ノア"><h3>ノア</h3></button>
-    <button class="char" data-name="セナ"><h3>セナ</h3></button>
+    <button class="char" data-name="アルメ港" data-kana="雲海の交易港" data-img="assets/harbor.jpg" data-text="雲の海に浮かぶ交易の港。夜明けごとに、灯台の船団が空へ漕ぎ出す。"><img src="assets/harbor.jpg" alt=""><span class="char-text"><h3>アルメ港</h3><span class="char-sub">雲海の交易港</span></span></button>
+    <button class="char" data-name="硝子の尖塔" data-kana="凍てついた峰" data-img="assets/spires.jpg" data-text="凍てついた峰が空へ伸びる。夜には、天幕のようなオーロラが降りる。"><img src="assets/spires.jpg" alt=""><span class="char-text"><h3>硝子の尖塔</h3><span class="char-sub">凍てついた峰</span></span></button>
+    <button class="char" data-name="墜星の谷" data-kana="星の欠片が眠る谷" data-img="assets/valley.jpg" data-text="空から落ちた星の欠片が眠る谷。拾い集めると、航路を照らす灯になる。"><img src="assets/valley.jpg" alt=""><span class="char-text"><h3>墜星の谷</h3><span class="char-sub">星の欠片が眠る谷</span></span></button>
+    <button class="char" data-name="翠の浮島" data-kana="滝が雲へ落ちる島" data-img="assets/isles.jpg" data-text="滝が雲海へ落ちていく緑の島。島ごとに、違う風が吹いている。"><img src="assets/isles.jpg" alt=""><span class="char-text"><h3>翠の浮島</h3><span class="char-sub">滝が雲へ落ちる島</span></span></button>
   </div>
 </section>
 <section class="section">
-  <h2>NEWS</h2>
+  <div class="section-head"><h2>お知らせ</h2></div>
   <div class="news">
-    <p>事前登録者数が 100 万人を突破しました。</p>
-    <p>公式生放送を 12 月 20 日に配信します。</p>
-    <p>主題歌のアーティストが決まりました。</p>
+    <p><time>2026.11.30</time>事前登録者数が 100 万人を突破しました。</p>
+    <p><time>2026.11.18</time>公式生放送を 12 月 20 日に配信します。</p>
+    <p><time>2026.11.02</time>主題歌のアーティストが決まりました。</p>
   </div>
 </section>
 <!-- 実機の確認の記録の欄。LP の見た目に混ざらないよう、ページの一番下に置く。 -->
@@ -161,7 +182,7 @@
   }
 </script>
 <dialog class="sheet" id="sheet">
-  <div class="sheet-body"><div class="sheet-art"></div><h3 id="sheet-name">リラ</h3><p>星降る夜に目覚めた、記憶を持たない少女。流れ星の欠片を集めて旅をする。</p></div>
+  <div class="sheet-body"><img class="sheet-art" id="sheet-art" alt=""><div class="sheet-text"><span class="sheet-kana" id="sheet-kana"></span><h3 id="sheet-name">アルメ港</h3><p id="sheet-text"></p></div></div>
 </dialog>
 <script>
   const params = new URLSearchParams(location.search);
@@ -196,20 +217,29 @@
     fit();
   }
 
-  function openSheet(name) {
+  const mid = params.get("mid") === "1";
+  if (mid) root.classList.add("mid");
+  const fill = (prefix, card) => {
+    document.getElementById(`${prefix}-name`).textContent = card.dataset.name;
+    document.getElementById(`${prefix}-kana`).textContent = card.dataset.kana;
+    document.getElementById(`${prefix}-text`).textContent = card.dataset.text;
+    document.getElementById(`${prefix}-art`).src = card.dataset.img;
+  };
+
+  function openSheet(card) {
     if (duo) {
-      document.getElementById("layer-name").textContent = name;
+      fill("layer", card);
       layer.style.top = `${scrollY}px`;
       layer.hidden = false;
       fit();
-      nextFrame(() => layer.classList.add("in"));
+      if (!mid) nextFrame(() => layer.classList.add("in"));
     } else {
-      document.getElementById("sheet-name").textContent = name;
+      fill("sheet", card);
       sheet.showModal();
-      nextFrame(() => sheet.classList.add("in"));
+      if (!mid) nextFrame(() => sheet.classList.add("in"));
     }
   }
-  for (const card of document.querySelectorAll(".char")) card.addEventListener("click", () => openSheet(card.dataset.name));
+  for (const card of document.querySelectorAll(".char")) card.addEventListener("click", () => openSheet(card));
   sheet.addEventListener("click", (event) => { if (event.target === sheet) sheet.close(); });
   sheet.addEventListener("close", () => sheet.classList.remove("in"));
   document.getElementById("layer-backdrop").addEventListener("click", () => layer.classList.remove("in"));
@@ -221,7 +251,7 @@
 
   addEventListener("load", () => {
     if (params.get("at") === "chars") document.getElementById("chars").scrollIntoView({ block: "start" });
-    if (params.get("open") === "1") setTimeout(() => openSheet("リラ"), 1500);
+    if (params.get("open") === "1") setTimeout(() => openSheet(document.querySelector(".char")), 1500);
   });
 
   // ?debug=1：測定用。要所の値を測定のサーバーへ送る。
