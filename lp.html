@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STARFALL</title>
+<!--
+  iPhone Duo の右の列で「見切れ」が出るかを比べる、架空のゲームの LP。
+    ?mode=plain  最適化なし。よくある LP の作り。
+    ?mode=duo    最適化あり。KV・ヘッダー・カルーセル・シートを右の列の奥（画面の物理的な右端）まではみ出させ、
+                 その副作用（横揺れ・縮小）を止める。列の無い端末では --gutter が 0 になり、はみ出さない。
+    ?open=1      読み込みの 1.5 秒後にキャラクターのシートを開く。
+    ?slow=1      シートの動きを 3 秒にする（途中を撮るため）。
+    ?at=chars    読み込み時にキャラクターの段までスクロールする。
+-->
+<style>
+  :root { --page: #0b1020; --ink: #f8fafc; --muted: #a5b4fc; --sheet-ms: 450ms; --gutter: 0px; }
+  html { background: var(--page); color: var(--ink); }
+  body { margin: 0; font: 15px/1.6 -apple-system, system-ui, sans-serif; }
+  h1, h2, h3, p { margin: 0; }
+
+  /* ヘッダー */
+  .header { position: fixed; z-index: 20; top: 0; left: 0; right: 0; height: 56px; }
+  .header-bar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #312e81; box-sizing: border-box; }
+  .logo { font-weight: 800; letter-spacing: .3em; font-size: 14px; }
+  .menu { width: 22px; height: 14px; border-block: 2px solid var(--ink); position: relative; }
+  .menu::after { content: ""; position: absolute; inset: 4px 0 auto; border-top: 2px solid var(--ink); }
+
+  /* キービジュアル。太陽を右寄りに置いた空と山並み。 */
+  .hero { position: relative; height: 620px; overflow: hidden; display: grid; align-content: end; gap: 12px; padding: 0 24px 72px;
+    background:
+      radial-gradient(circle at 80% 36%, #fff7ed 0 5%, #fdba74 9%, rgba(249, 115, 22, 0) 34%),
+      linear-gradient(180deg, #1e1b4b 0%, #6d28d9 42%, #f97316 74%, #fbbf24 100%); }
+  .hero::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46%; background: var(--page);
+    clip-path: polygon(0 58%, 10% 38%, 22% 52%, 36% 18%, 50% 46%, 64% 26%, 78% 50%, 90% 30%, 100% 44%, 100% 100%, 0 100%); }
+  .hero > * { position: relative; z-index: 2; }
+  .title { font-size: 44px; font-weight: 900; letter-spacing: .12em; line-height: 1; text-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
+  .release { color: #fde68a; letter-spacing: .2em; font-size: 13px; }
+  .cta { justify-self: start; padding: 12px 28px; border-radius: 999px; background: #fbbf24; color: #1e1b4b; font-weight: 800; }
+
+  /* キャラクターのカルーセル。次のカードが右に覗く。 */
+  .section { display: grid; gap: 16px; padding: 40px 0; }
+  .section h2 { padding: 0 24px; font-size: 13px; letter-spacing: .3em; color: var(--muted); }
+  .chars { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 24px; scroll-padding: 0 24px; scrollbar-width: none; }
+  .char { flex: 0 0 78%; height: 360px; border: 0; font: inherit; text-align: left; color: inherit; border-radius: 20px; scroll-snap-align: start; position: relative; overflow: hidden; display: grid; align-content: end; padding: 20px; box-sizing: border-box; }
+  .char::before { content: ""; position: absolute; left: 50%; top: 18%; width: 120px; height: 120px; margin-left: -60px; border-radius: 50%; background: rgba(255, 255, 255, .85); }
+  .char::after { content: ""; position: absolute; left: 50%; top: 46%; width: 200px; height: 240px; margin-left: -100px; border-radius: 100px 100px 0 0; background: rgba(255, 255, 255, .7); }
+  .char h3 { position: relative; z-index: 1; font-size: 24px; color: #0b1020; }
+  .char:nth-child(1) { background: linear-gradient(160deg, #f472b6, #7c3aed); }
+  .char:nth-child(2) { background: linear-gradient(160deg, #38bdf8, #1d4ed8); }
+  .char:nth-child(3) { background: linear-gradient(160deg, #34d399, #0f766e); }
+  .char:nth-child(4) { background: linear-gradient(160deg, #fbbf24, #ea580c); }
+
+  .news { display: grid; gap: 12px; padding: 0 24px 160px; }
+  .news p { padding: 16px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+
+  /* キャラクターのシート。右から出る。 */
+  .sheet-body { padding: 24px; box-sizing: border-box; height: 100%; background: linear-gradient(180deg, #fdf2f8, #ede9fe); color: #1e1b4b; }
+  .sheet-art { height: 240px; border-radius: 16px; background: linear-gradient(160deg, #f472b6, #7c3aed); margin-bottom: 16px; }
+  .sheet-body h3 { font-size: 26px; }
+  /* 最適化なし：よくある fixed の <dialog>。 */
+  dialog.sheet { position: fixed; inset: 0 0 0 auto; width: 86%; max-width: none; height: auto; max-height: none; margin: 0; padding: 0; border: 0; outline: none;
+    background: none; box-shadow: -12px 0 32px rgba(0, 0, 0, .45); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
+  dialog.sheet.in { transform: none; }
+  dialog.sheet::backdrop { background: rgba(0, 0, 0, .55); }
+  /* 最適化あり：文書の中の absolute の層を、開いた時点のスクロール位置に置く（top は JS）。
+     fixed・sticky・最上位の層（<dialog>）は列の縁で切られ、右端に接すると Safari が列を塗りつぶす面を被せるので使わない。 */
+  .layer { position: absolute; z-index: 30; top: 0; left: 0; width: 100%; height: 0; }
+  .layer[hidden] { display: none; }
+  /* 動いている間のはみ出しで文書の幅が広がらないよう、列の奥までの箱で切る。高さはアドレスバーの裏まで。 */
+  .layer-clip { position: absolute; top: 0; left: 0; width: calc(100% + var(--gutter)); height: calc(100lvh + 160px); overflow: clip; }
+  .layer-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); opacity: 0; transition: opacity var(--sheet-ms) ease; }
+  /* 幅は「見える範囲の 86%」に列の幅を足したもの（.layer-clip の幅は見える範囲 + 列の幅）。 */
+  .layer-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: calc((100% - var(--gutter)) * .86 + var(--gutter)); box-shadow: -12px 0 32px rgba(0, 0, 0, .45); transform: translateX(100%); transition: transform var(--sheet-ms) ease; }
+  .layer-sheet .sheet-body { padding-right: calc(24px + var(--gutter)); }
+  .layer.in .layer-backdrop { opacity: 1; }
+  .layer.in .layer-sheet { transform: none; }
+
+  /* ===== 最適化あり：右の列の奥まで（--gutter の分だけ）はみ出させる。文字は見える範囲に置く。 ===== */
+  /* ヘッダー：上に残し続ける（fixed・sticky）と列の縁で切られるので、KV に重ねてスクロールで流れる absolute にする。 */
+  .duo .header { position: absolute; right: auto; width: calc(100% + var(--gutter)); }
+  .duo .header-bar { padding-right: calc(16px + var(--gutter)); }
+  .duo .hero { margin-right: calc(-1 * var(--gutter)); padding-right: calc(24px + var(--gutter)); }
+  .duo .chars { margin-right: calc(-1 * var(--gutter)); padding-right: calc(24px + var(--gutter)); }
+</style>
+</head>
+<body>
+<div class="layer" id="layer" hidden>
+  <div class="layer-clip">
+    <div class="layer-backdrop" id="layer-backdrop"></div>
+    <div class="layer-sheet" role="dialog" aria-modal="true" aria-labelledby="layer-name">
+      <div class="sheet-body"><div class="sheet-art"></div><h3 id="layer-name">リラ</h3><p>星降る夜に目覚めた、記憶を持たない少女。流れ星の欠片を集めて旅をする。</p></div>
+    </div>
+  </div>
+</div>
+<header class="header"><div class="header-bar"><span class="logo">STARFALL</span><span class="menu"></span></div></header>
+<section class="hero">
+  <p class="release">2026.12.24 RELEASE</p>
+  <h1 class="title">STAR<br>FALL</h1>
+  <a class="cta">事前登録</a>
+</section>
+<section class="section" id="chars">
+  <h2>CHARACTERS</h2>
+  <div class="chars">
+    <button class="char" data-name="リラ"><h3>リラ</h3></button>
+    <button class="char" data-name="カイ"><h3>カイ</h3></button>
+    <button class="char" data-name="ノア"><h3>ノア</h3></button>
+    <button class="char" data-name="セナ"><h3>セナ</h3></button>
+  </div>
+</section>
+<section class="section">
+  <h2>NEWS</h2>
+  <div class="news">
+    <p>事前登録者数が 100 万人を突破しました。</p>
+    <p>公式生放送を 12 月 20 日に配信します。</p>
+    <p>主題歌のアーティストが決まりました。</p>
+  </div>
+</section>
+<!-- 実機の確認の記録の欄。LP の見た目に混ざらないよう、ページの一番下に置く。 -->
+<section class="obs-area" id="obs-area">
+  <p><a href="index.html">← 一覧へ</a>　<a id="other-mode"></a></p>
+</section>
+<style>
+  .obs-area { display: grid; gap: 12px; padding: 24px 24px 200px; color: #e2e8f0; font-size: 14px; }
+  .obs-area a { color: #93c5fd; }
+  .obs-area .card { display: grid; gap: 8px; padding: 12px; border: 1px solid #334155; border-radius: 12px; }
+  .obs-area .sim { color: #cbd5e1; border-left: 3px solid #64748b; padding-left: 8px; }
+  .obs-area .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .obs-area button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #64748b; background: #1e293b; color: #e2e8f0; }
+  .obs-area button.on { background: #2563eb; border-color: #2563eb; }
+  .obs-area input { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid #64748b; background: #0f172a; color: #e2e8f0; }
+  .obs-area .muted { color: #94a3b8; }
+</style>
+<script type="module">
+  import { observationBlock } from "./lab.js";
+
+  // モードごとの確認の項目。結果は一覧のページから QR で持ち出す。
+  const duoMode = new URLSearchParams(location.search).get("mode") === "duo";
+  const other = document.getElementById("other-mode");
+  other.href = `lp.html?mode=${duoMode ? "plain" : "duo"}`;
+  other.textContent = duoMode ? "最適化なしへ" : "最適化ありへ";
+  const ITEMS = duoMode
+    ? [
+        ["lp:duo-bleed", "KV・ヘッダー・カルーセル・シートが、列の奥（画面の物理的な右端）まで描かれる"],
+        ["lp:duo-drag", "ページを横にドラッグしても、ページは横に動かない（押さえている間も）"],
+        ["lp:duo-carousel", "カルーセルの上で横にスワイプすると、カルーセルだけが動く"],
+        ["lp:duo-pinchout", "ピンチで縮めても 1 倍で止まる（タブの一覧が開くのは Safari の普段の動き）"],
+        ["lp:duo-zoompan", "ピンチで拡大すると、横にも見て回れる。等倍に戻すと、また横に動かなくなる"],
+        ["lp:duo-sheet", "シートが画面の右端から滑り込み、列の下とアドレスバーの裏まで覆う。開いている間は後ろのページが動かない"],
+        ["lp:duo-doubletap", "未確認。シートを開いたままダブルタップしたとき、拡大して戻せなくならないか（Bug 325368 の恐れ）"],
+      ]
+    : [
+        ["lp:plain-cut", "ヘッダー・KV・カルーセルが列の縁でぷつりと切れる"],
+        ["lp:plain-sheet", "シートが列の縁から湧き出るように出て、開いた後も右は列の縁、下はアドレスバーの上で切れる"],
+      ];
+  const area = document.getElementById("obs-area");
+  for (const [id, expected] of ITEMS) {
+    const block = document.createElement("div");
+    area.append(block);
+    observationBlock(block, id, expected);
+  }
+</script>
+<dialog class="sheet" id="sheet">
+  <div class="sheet-body"><div class="sheet-art"></div><h3 id="sheet-name">リラ</h3><p>星降る夜に目覚めた、記憶を持たない少女。流れ星の欠片を集めて旅をする。</p></div>
+</dialog>
+<script>
+  const params = new URLSearchParams(location.search);
+  const root = document.documentElement;
+  const duo = params.get("mode") === "duo";
+  root.classList.add(duo ? "duo" : "plain");
+  if (params.get("slow") === "1") root.style.setProperty("--sheet-ms", "3s");
+  const sheet = document.getElementById("sheet");
+  const layer = document.getElementById("layer");
+  const nextFrame = (callback) => requestAnimationFrame(() => requestAnimationFrame(callback));
+  let fit = () => {};
+
+  if (duo) {
+    // 等倍より縮めると、列の奥に置いた分まで画面に収めようとして 0.82 倍まで縮むので止める。
+    document.querySelector('meta[name="viewport"]').content += ", minimum-scale=1";
+    // 右の列の幅を測って --gutter に入れ、はみ出しで生まれる横揺れを止める。
+    // 列の幅は CSS では取れない（env(safe-area-inset-right) は 0）。列の無い端末では 0 になる。
+    // 横揺れは、等倍の間だけ touch-action で横の移動を止め、拡大したら外して見て回れるようにする。
+    // シートを開いている間は、後ろのページを動かさない（none）。
+    fit = () => {
+      const zoomed = visualViewport.scale > 1.01;
+      root.style.touchAction = !layer.hidden ? "none" : zoomed ? "" : "pan-y pinch-zoom";
+      if (zoomed) return;
+      if (scrollX !== 0) scrollTo(0, scrollY);
+      const portrait = matchMedia("(orientation: portrait)").matches;
+      const gutter = portrait ? Math.max(0, screen.width - root.clientWidth) : 0;
+      root.style.setProperty("--gutter", `${gutter}px`);
+    };
+    visualViewport.addEventListener("resize", fit);
+    visualViewport.addEventListener("scroll", fit);
+    addEventListener("resize", fit);
+    fit();
+  }
+
+  function openSheet(name) {
+    if (duo) {
+      document.getElementById("layer-name").textContent = name;
+      layer.style.top = `${scrollY}px`;
+      layer.hidden = false;
+      fit();
+      nextFrame(() => layer.classList.add("in"));
+    } else {
+      document.getElementById("sheet-name").textContent = name;
+      sheet.showModal();
+      nextFrame(() => sheet.classList.add("in"));
+    }
+  }
+  for (const card of document.querySelectorAll(".char")) card.addEventListener("click", () => openSheet(card.dataset.name));
+  sheet.addEventListener("click", (event) => { if (event.target === sheet) sheet.close(); });
+  sheet.addEventListener("close", () => sheet.classList.remove("in"));
+  document.getElementById("layer-backdrop").addEventListener("click", () => layer.classList.remove("in"));
+  layer.addEventListener("transitionend", () => {
+    if (layer.classList.contains("in")) return;
+    layer.hidden = true;
+    fit();
+  });
+
+  addEventListener("load", () => {
+    if (params.get("at") === "chars") document.getElementById("chars").scrollIntoView({ block: "start" });
+    if (params.get("open") === "1") setTimeout(() => openSheet("リラ"), 1500);
+  });
+
+  // ?debug=1：測定用。要所の値を測定のサーバーへ送る。
+  if (params.get("debug") === "1") {
+    const rect = (selector) => {
+      const r = document.querySelector(selector).getBoundingClientRect();
+      return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
+    };
+    const send = (event) => navigator.sendBeacon("/log", JSON.stringify({
+      label: `lp-${params.get("mode")}`, event, t: Math.round(performance.now()),
+      inner: [innerWidth, innerHeight], scroll: [scrollX, scrollY],
+      scrollSize: [root.scrollWidth, root.scrollHeight], scale: visualViewport.scale,
+      gutter: getComputedStyle(root).getPropertyValue("--gutter"), touchAction: root.style.touchAction,
+      header: rect(".header-bar"), hero: rect(".hero"), chars: rect(".chars"), layerClip: rect(".layer-clip"),
+      headerStyle: getComputedStyle(document.querySelector(".header")).position,
+      charsScrollLeft: document.querySelector(".chars").scrollLeft,
+    }));
+    send("script");
+    let settle;
+    const later = (event) => () => { clearTimeout(settle); settle = setTimeout(() => send(event), 400); };
+    addEventListener("scroll", later("scroll-end"));
+    document.querySelector(".chars").addEventListener("scroll", later("chars-scroll-end"));
+    addEventListener("load", () => send("load"));
+    for (const ms of [1000, 3000, 7000]) setTimeout(() => send(`t${ms}`), ms);
+  }
+</script>
+</body>
+</html>

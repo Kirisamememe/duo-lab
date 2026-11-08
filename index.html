@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duo 実機の確認</title>
+<link rel="stylesheet" href="lab.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>
+</head>
+<body>
+<main>
+  <h1>iPhone Duo 実機の確認</h1>
+  <p class="muted">上から順に進めます。各ページで「記録」や「同じ／違う」を押すと、この端末の中に残ります。最後に「QR で書き出す」で自分の iPhone へ持ち出します。写真も撮っておくと確実です。</p>
+
+  <div class="card">
+    <h2>この端末</h2>
+    <pre id="device"></pre>
+    <p class="muted">記録：<span id="count">0</span> 件（判定 <span id="obs">0</span> 件）</p>
+    <div class="row">
+      <button type="button" id="export">QR で書き出す</button>
+      <button type="button" id="selfqr">このページの QR</button>
+      <button type="button" id="clear">記録を消す</button>
+    </div>
+    <div id="out"></div>
+  </div>
+
+  <div class="card">
+    <h2>店に行く前に</h2>
+    <p>自分の iPhone でこのページを開いておきます。店頭の端末では、自分の iPhone に「このページの QR」を出し、店頭の端末のカメラで読んで開きます。</p>
+    <p class="muted">設定を変える項目（P3）は、店員さんに断ってから行い、終わったら元に戻します。</p>
+  </div>
+
+  <div id="checks"></div>
+</main>
+<script type="module">
+  import { measure, describe, entries, clearAll, showExport, qrSvg, observationBlock } from "./lab.js";
+
+  // 確かめる項目。優先度の順。links は確かめ用のページ。
+  const CHECKS = [
+    { pri: "P1 必ず：閉じた縦（15 分）" },
+    { id: "env", title: "端末と設定を控える", links: [],
+      steps: "設定 › 一般 › 情報 の iOS の版を写真に撮る。設定 › アプリ › Safari の「タブ」の配置（下・上）を控える。アドレスバーの「ぁあ」でページの拡大が 100% かを見る（100% でないと値が変わる）。",
+      expected: "UA は iPhone OS 18_7 のまま。Safari の版は iOS 27.1 のシミュレーターで Version/27.0、iOS 27.2 のシミュレーターで Version/27.2" },
+    { id: "layout", title: "画面の作りを撮る", links: [["measure.html", "測るページ"]],
+      steps: "閉じた縦で写真を撮る。下にスクロールして、下のアドレスバーと右の列がどうなるかも撮る。",
+      expected: "下にアドレスバー（ガラス）、右に縦の列（カメラ・時刻・戻る・ブックマーク・＋・タブ）。スクロールするとアドレスバーは小さく畳まれ、右の列は畳まれない" },
+    { id: "units", title: "値を測る（スクロールの前と後）", links: [["measure.html", "測るページ"], ["measure.html?cover=1", "cover を付けたページ"]],
+      steps: "測るページで「閉じ縦・スクロール前」を押して記録 → 下へスクロールしてアドレスバーが畳まれたら「閉じ縦・スクロール後」で記録。cover を付けたページでも同じく記録。",
+      expected: "幅の4単位はすべて 382。svh 580。lvh は iOS 27.1 のシミュレーターで 597.66、iOS 27.2 のシミュレーターで 617.66、WebKit ブログで 618（実機の iOS の版と合わせて見る）。safe-area は cover があっても4辺 0" },
+    { id: "column", title: "右の列の色", links: [["column.html", "列の色のページ"]],
+      steps: "列の色のページで、ケースを順に開いて写真を撮り、各ケースで「同じ／違う」を押す。",
+      expected: "列は背景色。theme-color は効かない。fixed のヘッダーは列の手前で切れる。右端の fixed の帯は 6px 以上で列を塗り、5px と高さ半分では効かない" },
+    { id: "under", title: "列の下に描かれるもの", links: [["under.html", "列の下のページ"]],
+      steps: "列の下のページで、ケースを順に開いて写真を撮り、各ケースで「同じ／違う」を押す。",
+      expected: "普通の流れ・absolute のはみ出しは列の下に描かれる（縞が続く）。fixed・sticky・dialog は 382 で切れる" },
+    { id: "lp", title: "LP の対比（最適化なし／あり）", links: [["lp.html?mode=plain", "最適化なし"], ["lp.html?mode=duo", "最適化あり"], ["lp.html?mode=plain&open=1&slow=1", "なし・シート"], ["lp.html?mode=duo&open=1&slow=1", "あり・シート"]],
+      steps: "それぞれ写真を撮る（上の KV、カルーセルまでスクロール、シートが出る途中と開いた後）。最適化ありで、ページを横にドラッグ、カルーセルを横にスワイプ、ピンチで縮める、拡大して横へ動かす、シートを開いて後ろをスクロール、シートを開いたままダブルタップ。結果は各ページの下の欄に記録する。",
+      expected: "なし：ヘッダー・KV・カルーセル・シートが列の縁で切れる。あり：列の奥まで描かれ、ページは横に動かず、縮めても 1 倍で止まり、拡大すれば横へ動ける" },
+
+    { pri: "P2 できれば：ほかの姿勢（10 分）" },
+    { id: "landscape", title: "閉じて横向き", links: [["measure.html", "測るページ"]],
+      steps: "閉じたまま横にして「閉じ横」で記録。列が右・左のどちらに出るか写真を撮る。",
+      expected: "WebKit ブログでは幅 594（画面 678）なので、横向きにも 84pt の列がある。位置はシミュレーターで未確認（Tech Talk は横向きで左に出ることがあると言う）" },
+    { id: "open", title: "開いて縦・横", links: [["measure.html", "測るページ"]],
+      steps: "開いて縦で「開き縦」、横にして「開き横」で記録。タブバーの位置と、横の列の有無を写真に撮る。",
+      expected: "ブログ：開き縦 669・svh 867・lvh 902、開き横 951・585・620。タブバーは上" },
+    { id: "fold", title: "開閉の途中のイベント", links: [["events.html", "イベントのページ"]],
+      steps: "イベントのページを開き、少しスクロールしてから、開く → 閉じるを1回ずつ。終わったら「記録」。スクロール位置が保たれたかも見る。",
+      expected: "シミュレーターでは未測定。第三者の報告では、再読み込みは起きず resize が 2〜3 回、途中に 466×498 を挟む" },
+    { id: "split", title: "2つ並べた窓（Split View）", links: [["measure.html", "測るページ"]],
+      steps: "開いて横で Safari を2つ並べ、測るページで「Split 左」「Split 右」で記録。列の有無と位置を写真に撮る。",
+      expected: "ブログ：各窓 385・svh 571・lvh 609" },
+    { id: "newtab", title: "新しいタブで開いた直後の大きさ", links: [["newtab.html", "新しいタブのページ"]],
+      steps: "新しいタブのページで「新しいタブで開く」を3回ほど押す（開いたタブで自動で記録される）。",
+      expected: "シミュレーターでは、新しいタブの 75 回中 14 回で、読み込みの時点に 466×678 が出てから 382×580 に縮んだ" },
+
+    { pri: "P3 余裕があれば（設定を変える。店員さんに断り、元に戻す）" },
+    { id: "posture", title: "半分折ったとき（Feature Flags）", links: [["posture.html", "姿勢のページ"]],
+      steps: "設定 › アプリ › Safari › 詳細 › Feature Flags で「Device Posture API」「Viewport Segments API」をオン → 姿勢のページを本の形に半分折って見る → 記録 → フラグを元に戻す。",
+      expected: "既定ではどちらも使えない（シミュレーター）。フラグを入れると、半分折ったときだけ folded・2区画になる見込み（WebKit のソースからの推測）" },
+    { id: "settings", title: "設定の違い", links: [["measure.html", "測るページ"], ["column.html?case=bg-blue", "列の色（背景）"]],
+      steps: "タブを上の配置／透明度を下げる／ダークモード、をそれぞれ試し、測るページで記録し、列の色を写真に撮る。終わったら元に戻す。",
+      expected: "未確認。lvh の食い違いがタブの配置で説明できるかを見たい" },
+  ];
+
+  const list = document.getElementById("checks");
+  for (const check of CHECKS) {
+    if (check.pri) {
+      const heading = document.createElement("h2");
+      heading.textContent = check.pri;
+      list.append(heading);
+      continue;
+    }
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <strong>${check.title}</strong>
+      <p>${check.steps}</p>
+      <div class="row">${check.links.map(([href, label]) => `<a class="button" href="${href}">${label}</a>`).join("")}</div>
+      <div data-obs></div>`;
+    list.append(card);
+    observationBlock(card.querySelector("[data-obs]"), check.id, check.expected);
+  }
+
+  const refresh = () => {
+    const all = entries();
+    document.getElementById("count").textContent = all.length;
+    document.getElementById("obs").textContent = all.filter((e) => e.kind === "obs").length;
+  };
+  document.getElementById("device").textContent = `${navigator.userAgent}\n\n${describe(measure())}`;
+  refresh();
+  addEventListener("pageshow", refresh);
+
+  const out = document.getElementById("out");
+  document.getElementById("export").addEventListener("click", () => showExport(out));
+  document.getElementById("selfqr").addEventListener("click", () => {
+    const url = location.href.split("#")[0];
+    out.innerHTML = `<p>このページの URL：${url}</p><div class="qr">${qrSvg(url) ?? ""}</div>`;
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    if (confirm("この端末の記録を全部消します。よろしいですか？")) {
+      clearAll();
+      location.reload();
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Duo 列の下</title>
+<link rel="stylesheet" href="lab.css">
+<style>
+  /* --g は右の列の幅の見積もり（JS で入れる。入らなければ 84px）。
+     縞（10px ごとのマゼンタとシアン）が列の中でも続けば本物、1色なら Safari が被せた面。 */
+  :root { --g: 84px; }
+  .stripes { background: repeating-linear-gradient(90deg, #ff00ff 0 10px, #00ffff 10px 20px); }
+  .narrow { padding-right: 170px; }
+  .wide-box { height: 160px; margin-right: calc(-1 * var(--g)); }
+  .fixed-box { position: fixed; z-index: 10; top: 200px; right: calc(-1 * var(--g)); width: 220px; height: 200px; }
+  .layer { position: absolute; z-index: 10; top: 0; left: 0; width: 100%; height: 0; }
+  .sticky-layer { position: sticky; z-index: 10; top: 0; height: 0; }
+  .clip { position: absolute; top: 0; left: 0; width: calc(100% + var(--g)); height: calc(100lvh + 160px); overflow: clip; pointer-events: none; }
+  .clip > .sheet { position: absolute; top: 0; right: 0; bottom: 0; width: calc(150px + var(--g)); }
+  dialog.wide-dialog { position: fixed; inset: 0 calc(-1 * var(--g)) 0 auto; width: 220px; height: auto; max-height: none; margin: 0; padding: 0; border: 0; }
+  .track { display: flex; gap: 12px; }
+  .track > div, .scroller > div { flex: 0 0 85%; height: 200px; border-radius: 16px; }
+  .scroller { display: flex; gap: 12px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<main id="main">
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1 id="title">列の下</h1>
+  <p id="look"></p>
+  <p class="muted" id="gutter"></p>
+  <div id="stage"></div>
+  <div id="obs"></div>
+  <div class="row" id="nav"></div>
+</main>
+<div class="filler"></div>
+<script type="module">
+  import { observationBlock, gutterGuess, measure } from "./lab.js";
+
+  const stage = document.getElementById("stage");
+  const card = (className) => {
+    const el = document.createElement("div");
+    el.className = className;
+    return el;
+  };
+  const CASES = [
+    { id: "wide", title: "普通の流れで、列の幅だけ広い箱", look: "列の下（ガラスのボタンの後ろ）に縞が続くか。ページを横にスクロールするとどうなるか", sim: "列の下まで縞が続き、ボタンのガラスが色付く。ページは列の幅だけ横にスクロールでき、最後まで動かすと列には白が出る",
+      setup: () => stage.append(card("stripes wide-box")) },
+    { id: "absolute", title: "文書の中の absolute のシート（縞）", look: "列の中に縞が続くか、アドレスバーの裏まで描かれるか", sim: "列の中にも縞が続き、アドレスバーの裏まで描かれる（本物の中身）",
+      setup: () => { narrow(); const layer = card("layer"); const clip = card("clip"); clip.append(card("stripes sheet")); layer.append(clip); document.body.prepend(layer); document.body.style.position = "relative"; } },
+    { id: "sticky", title: "sticky の層のシート（縞）", look: "列が縞か1色か。シートの下の端", sim: "列は1色に塗られる（Safari が被せた面）。シートそのものは列の縁と、アドレスバーの上（580 付近）で切れる",
+      setup: () => { narrow(); const layer = card("sticky-layer"); const clip = card("clip"); clip.append(card("stripes sheet")); layer.append(clip); document.body.prepend(layer); } },
+    { id: "fixed", title: "右へはみ出す fixed の箱（縞）", look: "列の下に出るか", sim: "列の縁（382）で切れ、列の下には出ない",
+      setup: () => document.body.append(card("stripes fixed-box")) },
+    { id: "dialog", title: "右へはみ出す <dialog>（縞）", look: "列の下に出るか", sim: "列の縁（382）で切れ、列の下には出ない",
+      setup: () => { const dialog = document.createElement("dialog"); dialog.className = "wide-dialog stripes"; dialog.addEventListener("click", () => dialog.close()); document.body.append(dialog); dialog.showModal(); } },
+    { id: "track", title: "外枠が overflow: visible のカルーセル", look: "次のカードが列の下に見えるか。ページを横にドラッグできてしまうか", sim: "次のカードが列の下に見える。ページの幅が広がり、横にスクロールできてしまう",
+      setup: () => { const track = card("track"); for (let i = 0; i < 4; i++) { const c = card(""); c.style.background = i % 2 ? "#00ffff" : "#ff00ff"; track.append(c); } stage.append(track); } },
+    { id: "scroller", title: "overflow-x: auto のカルーセル", look: "次のカードがどこで切れるか", sim: "カルーセルの箱の端（列の縁）で切れ、列の下には出ない",
+      setup: () => { const scroller = card("scroller"); for (let i = 0; i < 4; i++) { const c = card(""); c.style.background = i % 2 ? "#00ffff" : "#ff00ff"; scroller.append(c); } stage.append(scroller); } },
+    { id: "zoom", title: "拡大したとき", look: "ピンチで拡大して右へ動かしたとき、列の下にも中身が見えるか", sim: "拡大すると、見える範囲の外の中身が列の下にも描かれる",
+      setup: () => { const ruler = card("stripes"); ruler.style.height = "200px"; stage.append(ruler); } },
+  ];
+  function narrow() { document.getElementById("main").classList.add("narrow"); }
+
+  const gutter = gutterGuess(measure());
+  if (gutter > 0) document.documentElement.style.setProperty("--g", `${gutter}px`);
+  document.getElementById("gutter").textContent = `列の幅の見積もり：${gutter}（0 以下なら 84px で試す）`;
+
+  const id = new URLSearchParams(location.search).get("case") ?? CASES[0].id;
+  const index = Math.max(0, CASES.findIndex((c) => c.id === id));
+  const current = CASES[index];
+  document.getElementById("title").textContent = `${index + 1} / ${CASES.length}　${current.title}`;
+  document.getElementById("look").textContent = `見る所：${current.look}`;
+  current.setup();
+  observationBlock(document.getElementById("obs"), `under:${current.id}`, current.sim);
+  const nav = document.getElementById("nav");
+  if (index > 0) nav.insertAdjacentHTML("beforeend", `<a class="button" href="under.html?case=${CASES[index - 1].id}">← 前のケース</a>`);
+  if (index < CASES.length - 1) nav.insertAdjacentHTML("beforeend", `<a class="button" href="under.html?case=${CASES[index + 1].id}">次のケース →</a>`);
+</script>
+</body>
+</html>

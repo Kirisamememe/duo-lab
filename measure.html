@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // ?cover=1 のときだけ viewport-fit=cover を付ける。
+  if (new URLSearchParams(location.search).get("cover") === "1") {
+    document.querySelector('meta[name="viewport"]').content += ", viewport-fit=cover";
+  }
+</script>
+<title>Duo 測る</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<main>
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1>測る</h1>
+  <p class="muted" id="mode"></p>
+  <pre id="values"></pre>
+  <div class="card">
+    <strong>今の姿勢で記録する</strong>
+    <div class="row" id="labels"></div>
+    <input type="text" id="custom" placeholder="ほかの名前で記録するときはここに書いて「記録」">
+    <div class="row"><button type="button" id="save">記録</button></div>
+    <p class="muted" id="saved"></p>
+  </div>
+  <div class="card">
+    <strong>直近のイベント（新しい順）</strong>
+    <pre id="events"></pre>
+  </div>
+</main>
+<div class="filler"></div>
+<script type="module">
+  import { measure, describe, record, watchEvents } from "./lab.js";
+
+  const cover = new URLSearchParams(location.search).get("cover") === "1";
+  document.getElementById("mode").textContent = cover ? "viewport-fit=cover を付けたページ" : "viewport-fit を付けないページ（cover を付けた版は一覧から）";
+
+  const LABELS = ["閉じ縦・スクロール前", "閉じ縦・スクロール後", "閉じ横", "開き縦", "開き横", "Split 左", "Split 右", "半開き"];
+  const labels = document.getElementById("labels");
+  const saved = document.getElementById("saved");
+  const save = (label) => {
+    const count = record("snapshot", `${label}${cover ? "（cover）" : ""}`, { ...measure(), events: recent.slice(0, 12) });
+    saved.textContent = `「${label}」を記録しました（全部で ${count} 件）`;
+  };
+  for (const label of LABELS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => save(label));
+    labels.append(button);
+  }
+  document.getElementById("save").addEventListener("click", () => {
+    const label = document.getElementById("custom").value.trim();
+    if (label) save(label);
+  });
+
+  const values = document.getElementById("values");
+  const update = () => { values.textContent = describe(measure()); };
+  const recent = [];
+  const events = document.getElementById("events");
+  watchEvents((entry) => {
+    recent.unshift(entry);
+    recent.length = Math.min(recent.length, 30);
+    events.textContent = recent.map((e) => `${String(e.t).padStart(6)}ms ${e.type.padEnd(14)} inner ${e.inner.join("×")}  vv ${e.vv ? `${e.vv[0]}×${e.vv[1]}@${e.vv[4]}` : "-"}  scroll ${e.scroll[1]}`).join("\n");
+    update();
+  });
+  update();
+</script>
+</body>
+</html>

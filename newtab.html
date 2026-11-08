@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duo 新しいタブ</title>
+<link rel="stylesheet" href="lab.css">
+<script>
+  // 読み込みのいちばん早い時点の大きさ。新しいタブでは画面いっぱい（466×678）が先に出ることがある。
+  window.earliest = [innerWidth, innerHeight];
+</script>
+</head>
+<body>
+<main>
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1>新しいタブで開いた直後</h1>
+  <p>「新しいタブで開く」を3回ほど押します。開いたタブで自動で記録され、下に結果が出ます。確かめたら、開いたタブは閉じてかまいません。</p>
+  <div class="row">
+    <a class="button" href="newtab.html?via=new" target="_blank">新しいタブで開く</a>
+    <a class="button" href="newtab.html?via=same">同じタブで開き直す</a>
+  </div>
+  <pre id="values"></pre>
+  <div id="obs"></div>
+</main>
+<script type="module">
+  import { record, observationBlock } from "./lab.js";
+
+  const via = new URLSearchParams(location.search).get("via");
+  const samples = { earliest: window.earliest, module: [innerWidth, innerHeight] };
+  const show = () => { document.getElementById("values").textContent = `開き方：${via ?? "（一覧から）"}\n${Object.entries(samples).map(([k, v]) => `${k.padEnd(10)} ${v.join(" × ")}`).join("\n")}`; };
+  addEventListener("load", () => { samples.load = [innerWidth, innerHeight]; show(); });
+  requestAnimationFrame(() => requestAnimationFrame(() => { samples.raf2 = [innerWidth, innerHeight]; show(); }));
+  setTimeout(() => {
+    samples.ms1000 = [innerWidth, innerHeight];
+    show();
+    if (via) record("newtab", `新しいタブ（${via}）`, samples);
+  }, 1000);
+  show();
+  observationBlock(document.getElementById("obs"), "newtab", "シミュレーターでは新しいタブの 75 回中 14 回で、earliest か load に 466×678 が出てから 382×580 に縮んだ。同じタブでは起きなかった");
+</script>
+</body>
+</html>

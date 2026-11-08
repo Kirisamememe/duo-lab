@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duo 結果の受け取り</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<main>
+  <h1>結果の受け取り</h1>
+  <p id="status"></p>
+  <div class="row" id="actions" hidden>
+    <button type="button" id="copy">コピー</button>
+    <button type="button" id="share">共有</button>
+    <a class="button" id="download" download="duo-lab.json">ファイルに保存</a>
+  </div>
+  <pre id="result"></pre>
+</main>
+<script>
+  // 店頭の端末の QR から開かれる。URL の # の後ろは「受け渡しの番号.何枚目.全部で何枚.中身」。
+  // 何枚かに分かれた中身をこの iPhone の中でつなぎ、全部そろったら JSON に戻して見せる。
+  // 続けて読むと、同じタブで # の後ろだけが変わることがあるので、hashchange でも受け取る。
+  const status = document.getElementById("status");
+  let pretty = "";
+  document.getElementById("copy").addEventListener("click", () => navigator.clipboard.writeText(pretty).then(() => { status.textContent = "コピーしました。"; }));
+  document.getElementById("share").addEventListener("click", () => navigator.share?.({ title: "Duo 実機の確認", text: pretty }));
+
+  function receive() {
+    const [id, part, total, data] = location.hash.slice(1).split(".");
+    const key = `duo-recv-${id}`;
+    let store = {};
+    try { store = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+    if (id && part && data) {
+      store[part] = data;
+      try { localStorage.setItem(key, JSON.stringify(store)); } catch {}
+    }
+    const have = Object.keys(store).length;
+    const need = Number(total || 0);
+    if (!id) {
+      status.textContent = "店頭の端末に出した QR を読むと、ここに結果が届きます。";
+    } else if (have < need) {
+      status.textContent = `${have} / ${need} 枚を受け取りました。店頭の端末で「次へ」を押して、残りの QR を読んでください。`;
+    } else {
+      const joined = Array.from({ length: need }, (_, i) => store[i + 1]).join("");
+      const text = atob(joined.replace(/-/g, "+").replace(/_/g, "/"));
+      pretty = JSON.stringify(JSON.parse(text), null, 1);
+      status.textContent = `全部（${need} 枚）を受け取りました。`;
+      document.getElementById("result").textContent = pretty;
+      document.getElementById("actions").hidden = false;
+      document.getElementById("download").href = URL.createObjectURL(new Blob([pretty], { type: "application/json" }));
+    }
+  }
+  receive();
+  addEventListener("hashchange", receive);
+</script>
+</body>
+</html>

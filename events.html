@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duo 開閉のイベント</title>
+<link rel="stylesheet" href="lab.css">
+</head>
+<body>
+<main>
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1>開閉のイベント</h1>
+  <p>少し下へスクロールしてから、開く → 閉じるを1回ずつ行い、「記録」を押します。下の番号で、スクロール位置が保たれたかも見ます。</p>
+  <div class="row">
+    <button type="button" id="save">記録</button>
+    <button type="button" id="reset">記録を始め直す</button>
+  </div>
+  <p class="muted" id="saved"></p>
+  <pre id="log"></pre>
+  <div id="lines" class="mono"></div>
+</main>
+<script type="module">
+  import { record, watchEvents } from "./lab.js";
+
+  // スクロール位置が保たれたかを見るための番号つきの行。
+  document.getElementById("lines").textContent = Array.from({ length: 120 }, (_, i) => `行 ${i + 1}`).join("\n");
+  document.getElementById("lines").style.whiteSpace = "pre";
+
+  let log = [];
+  const view = document.getElementById("log");
+  const render = () => {
+    view.textContent = log.map((e) => `${String(e.t).padStart(6)}ms ${e.type.padEnd(16)} inner ${e.inner.join("×")}  vv ${e.vv ? `${e.vv[0]}×${e.vv[1]}` : "-"}  screen ${e.screen.join("×")}  scroll ${e.scroll[1]}  ${e.orient}`).join("\n");
+  };
+  watchEvents((entry) => {
+    log.push(entry);
+    render();
+  });
+  document.getElementById("save").addEventListener("click", () => {
+    const count = record("events", "開閉", log);
+    document.getElementById("saved").textContent = `イベント ${log.length} 件を記録しました（全部で ${count} 件）`;
+  });
+  document.getElementById("reset").addEventListener("click", () => {
+    log = [];
+    render();
+  });
+</script>
+</body>
+</html>

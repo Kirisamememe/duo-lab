@@ -1,0 +1,21 @@
+/* 確かめ用のページの共通の見た目。店頭で指で押しやすい大きさにする。
+   右の列の色を確かめるページもあるので、fixed・sticky の要素はここでは作らない。 */
+html { background: #ffffff; color: #111827; }
+body { margin: 0; font: 16px/1.6 -apple-system, system-ui, sans-serif; }
+main { display: grid; gap: 16px; padding: 16px; }
+h1 { margin: 0; font-size: 22px; }
+h2 { margin: 8px 0 0; font-size: 18px; }
+p { margin: 0; }
+a { color: #1d4ed8; }
+button, .button { font: inherit; font-size: 15px; padding: 10px 14px; border-radius: 10px; border: 1px solid #94a3b8; background: #f1f5f9; color: #111827; text-decoration: none; display: inline-block; }
+button:disabled { opacity: .4; }
+button.on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.card { display: grid; gap: 8px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; }
+.muted { color: #475569; font-size: 14px; }
+.sim { font-size: 14px; color: #334155; background: #f8fafc; border-left: 3px solid #94a3b8; padding: 6px 10px; }
+pre, .mono { font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; margin: 0; }
+.qr svg { width: 100%; max-width: 360px; height: auto; background: #fff; }
+.raw { max-height: 200px; overflow: auto; }
+input[type="text"] { font: inherit; padding: 8px; border: 1px solid #94a3b8; border-radius: 8px; width: 100%; box-sizing: border-box; }
+.filler { height: 1800px; background: repeating-linear-gradient(180deg, transparent 0 199px, rgba(0, 0, 0, .15) 199px 200px); }

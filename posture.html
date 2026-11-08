@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Duo 姿勢と区画</title>
+<link rel="stylesheet" href="lab.css">
+<style>
+  /* 定義が無ければ代わりの値（123px）になる。宣言ごと読み捨てられると 0 になる。 */
+  #seg-w { position: absolute; visibility: hidden; width: env(viewport-segment-width 0 0, 123px); height: env(viewport-segment-height 0 0, 123px); }
+  #seg-w2 { position: absolute; visibility: hidden; width: env(viewport-segment-width 1 0, 123px); }
+  #seg-r { position: absolute; visibility: hidden; width: env(viewport-segment-right 0 0, 123px); }
+</style>
+</head>
+<body>
+<div id="seg-w"></div><div id="seg-w2"></div><div id="seg-r"></div>
+<main>
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1>姿勢と区画</h1>
+  <p>Feature Flags の「Device Posture API」「Viewport Segments API」をオンにしてから、平ら・半分折った・閉じた、で値を見て、それぞれ記録します。終わったらフラグを元に戻します。</p>
+  <pre id="values"></pre>
+  <div class="row">
+    <button type="button" data-label="平らに開く">平らに開く</button>
+    <button type="button" data-label="本の形に半分折る">本の形</button>
+    <button type="button" data-label="PC の形に半分折る">PC の形</button>
+    <button type="button" data-label="閉じる">閉じる</button>
+  </div>
+  <p class="muted" id="saved"></p>
+  <div id="obs"></div>
+</main>
+<script type="module">
+  import { record, observationBlock } from "./lab.js";
+
+  const query = (q) => matchMedia(q).matches;
+  const box = (id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return [r.width, r.height];
+  };
+  const read = () => ({
+    devicePosture: navigator.devicePosture ? navigator.devicePosture.type : "無い",
+    postureFolded: query("(device-posture: folded)"),
+    postureContinuous: query("(device-posture: continuous)"),
+    hSegments: [1, 2, 3].filter((n) => query(`(horizontal-viewport-segments: ${n})`)),
+    vSegments: [1, 2, 3].filter((n) => query(`(vertical-viewport-segments: ${n})`)),
+    segments: window.viewport?.segments ? Array.from(window.viewport.segments, (r) => [r.x, r.y, r.width, r.height]) : "無い",
+    envSegment00: box("seg-w"),
+    envSegmentWidth10: box("seg-w2")[0],
+    envSegmentRight00: box("seg-r")[0],
+    inner: [innerWidth, innerHeight],
+  });
+  const values = document.getElementById("values");
+  const update = () => { values.textContent = JSON.stringify(read(), null, 1); };
+  update();
+  navigator.devicePosture?.addEventListener("change", update);
+  addEventListener("resize", update);
+  window.viewport?.addEventListener?.("segmentschange", update);
+  setInterval(update, 1000);
+
+  for (const button of document.querySelectorAll("[data-label]")) {
+    button.addEventListener("click", () => {
+      const count = record("posture", button.dataset.label, read());
+      document.getElementById("saved").textContent = `「${button.dataset.label}」を記録しました（全部で ${count} 件）`;
+    });
+  }
+  observationBlock(document.getElementById("obs"), "posture", "既定の設定ではどちらも使えない（シミュレーター）。フラグを入れると、半分折ったときだけ folded・2区画になる見込み（推測）");
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // theme-color のケースだけ、読み込みの時点で meta を足す。
+  if (new URLSearchParams(location.search).get("case") === "theme") document.write('<meta name="theme-color" content="#ff0000">');
+</script>
+<title>Duo 列の色</title>
+<link rel="stylesheet" href="lab.css">
+<style>
+  /* 試すための fixed の要素。ケースごとに JS で出す。 */
+  .t-header { position: fixed; z-index: 10; top: 0; left: 0; right: 0; height: 56px; background: #0a7d4f; }
+  .t-strip { position: fixed; z-index: 10; top: 0; bottom: 0; right: 0; background: #0a7d4f; }
+  .t-sheet { position: fixed; z-index: 10; top: 0; right: 0; bottom: 0; width: 300px; transform: translateX(100%); transition: transform 4s linear; box-shadow: -8px 0 24px rgba(0, 0, 0, .35); }
+  .t-sheet.in { transform: none; }
+  dialog.t-dialog::backdrop { background: rgba(0, 0, 0, .5); }
+  /* 上の帯の分だけ下げて、操作の欄が帯に隠れないようにする。 */
+  .pad-top { padding-top: 64px; }
+</style>
+</head>
+<body>
+<main id="main">
+  <p><a href="index.html">← 一覧へ</a></p>
+  <h1 id="title">右の列の色</h1>
+  <p id="look"></p>
+  <div class="row" id="actions"></div>
+  <div id="obs"></div>
+  <div class="row" id="nav"></div>
+</main>
+<div class="filler"></div>
+<script type="module">
+  import { observationBlock } from "./lab.js";
+
+  const solid = "#ff00ff";
+  const CASES = [
+    { id: "bg-blue", title: "背景だけ（薄い青）", look: "右の列の色", sim: "列は背景と同じ薄い青（#cfe8ff）", setup: () => setBg("#cfe8ff") },
+    { id: "bg-black", title: "背景だけ（黒）", look: "右の列の色", sim: "列は背景と同じ黒（#111111）", setup: () => setBg("#111111", "#eeeeee") },
+    { id: "theme", title: "theme-color を赤にする", look: "列や上下に赤が出るか", sim: "効かない（列は白のまま）", setup: () => setBg("#ffffff") },
+    { id: "header", title: "上端に全幅の fixed のヘッダー（緑）", look: "ヘッダーが列の手前で切れるか、列の色", sim: "列は白のまま。ヘッダーは列の手前でぷつりと切れる", setup: () => { setBg("#ffffff"); add("div", "t-header"); padTop(); } },
+    { id: "strip-6", title: "右端に全高の fixed の帯（幅 6px・緑）", look: "列の全高が緑になるか", sim: "列の全高が緑", setup: () => strip(6, "100%") },
+    { id: "strip-5", title: "右端に全高の fixed の帯（幅 5px・緑）", look: "列が緑になるか", sim: "効かない（列は白のまま）", setup: () => strip(5, "100%") },
+    { id: "strip-half", title: "右端に高さ半分の fixed の帯（幅 12px・緑）", look: "列が緑になるか", sim: "効かない（列は白のまま）", setup: () => strip(12, "50%") },
+    { id: "header-strip", title: "赤いヘッダー＋右端に 12px の緑の帯", look: "列の上の部分（ヘッダーの横）の色", sim: "列は上から下まで緑。ヘッダーの横も緑", setup: () => { setBg("#ffffff"); add("div", "t-header").style.background = "#b91c1c"; strip(12, "100%", false); padTop(); } },
+    { id: "dialog", title: "<dialog> を開く（覆いは黒の 50%）", look: "列も暗くなるか", sim: "列もページと同じだけ暗くなる（白なら #7f7f7f）", action: ["開く", () => openDialog()], setup: () => setBg("#ffffff") },
+    { id: "sheet-solid", title: "単色の fixed のシートを右から出す（4 秒）", look: "動いている間と、止まった瞬間の、列と下の帯（アドレスバーの裏）の色", sim: "動いている間は列も下の帯も背景色のまま。止まった瞬間に、列の全高と下の帯（全幅）がマゼンタに変わる", action: ["シートを出す", () => slide(solid)], setup: () => setBg("#111111", "#eeeeee") },
+    { id: "sheet-gradient", title: "グラデーションの fixed のシートを右から出す", look: "止まった後の列の色", sim: "列は背景色のまま", action: ["シートを出す", () => slide("linear-gradient(180deg, #ff00ff, #00ffff)")], setup: () => setBg("#111111", "#eeeeee") },
+  ];
+
+  function setBg(color, ink = "#111827") {
+    document.documentElement.style.background = color;
+    document.body.style.color = ink;
+  }
+  function add(tag, className) {
+    const el = document.createElement(tag);
+    el.className = className;
+    document.body.append(el);
+    return el;
+  }
+  function padTop() { document.getElementById("main").classList.add("pad-top"); }
+  function strip(width, height, white = true) {
+    if (white) setBg("#ffffff");
+    const el = add("div", "t-strip");
+    el.style.width = `${width}px`;
+    if (height !== "100%") Object.assign(el.style, { top: "auto", height });
+  }
+  function openDialog() {
+    const dialog = add("dialog", "t-dialog");
+    dialog.textContent = "覆いの外をタップすると閉じます";
+    dialog.addEventListener("click", () => dialog.close());
+    dialog.showModal();
+  }
+  function slide(background) {
+    const sheet = add("div", "t-sheet");
+    sheet.style.background = background;
+    sheet.addEventListener("click", () => sheet.remove());
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add("in")));
+  }
+
+  const id = new URLSearchParams(location.search).get("case") ?? CASES[0].id;
+  const index = Math.max(0, CASES.findIndex((c) => c.id === id));
+  const current = CASES[index];
+  document.getElementById("title").textContent = `${index + 1} / ${CASES.length}　${current.title}`;
+  document.getElementById("look").textContent = `見る所：${current.look}`;
+  current.setup();
+  if (current.action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = current.action[0];
+    button.addEventListener("click", current.action[1]);
+    document.getElementById("actions").append(button);
+  }
+  observationBlock(document.getElementById("obs"), `column:${current.id}`, current.sim);
+  const nav = document.getElementById("nav");
+  if (index > 0) nav.insertAdjacentHTML("beforeend", `<a class="button" href="column.html?case=${CASES[index - 1].id}">← 前のケース</a>`);
+  if (index < CASES.length - 1) nav.insertAdjacentHTML("beforeend", `<a class="button" href="column.html?case=${CASES[index + 1].id}">次のケース →</a>`);
+</script>
+</body>
+</html>
